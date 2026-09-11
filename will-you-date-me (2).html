@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A Question &amp; A Plan</title>
+
+<!--
+  ============================================================================
+  HOW TO CUSTOMISE THIS PAGE — read this before sending it to her
+  ============================================================================
+  Everything you'd want to change lives in ONE place: the CONFIG object near
+  the top of the <script> at the bottom of this file. Look for:
+
+    1. CONFIG.you / CONFIG.her        -> names used in text + WhatsApp message
+    2. CONFIG.askTitle / CONFIG.askSubtitle -> the opening question + subtext
+    3. CONFIG.year / CONFIG.month     -> auto-set to the current month/year,
+                                          only edit if you want a future month
+    4. CONFIG.alreadyDone             -> dates you've ALREADY been on (locked,
+                                          shown in gold, e.g. 3rd, 10th, 14th)
+    5. CONFIG.planOptions             -> your list of date ideas (temple,
+                                          cafe, Talao Pali, the Dadar day,
+                                          mall, etc.) — edit freely, add more,
+                                          reorder them, change the emoji.
+    6. CONFIG.whatsappNumber          -> optional. Leave "" to let her pick
+                                          who to send the WhatsApp message to.
+
+  This is plain HTML + JavaScript sitting inside this one file — no .env
+  file, no build step, no server, nothing to install. To edit it: open this
+  .html file in any text editor (Notepad, TextEdit, VS Code, etc.), find
+  "const CONFIG = {" further down, change the values between the quotes,
+  and save. To preview: just double-click the file and it opens in your
+  browser.
+  ============================================================================
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,500&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  /* ---------------------------------------------------------------------
+     DESIGN TOKENS — change the palette/fonts here, nowhere else
+  --------------------------------------------------------------------- */
+  :root{
+    --paper:      #FBF4EB;   /* warm ivory page background */
+    --panel:      #FFFBF5;   /* card surface, slightly lighter than page */
+    --ink:        #2A1B22;   /* near-black plum for body text */
+    --ink-soft:   #6E5A61;   /* muted secondary text */
+    --rose:       #B23A5B;   /* primary accent — deep berry rose */
+    --rose-deep:  #7C1F3C;   /* pressed/hover state, headline accents */
+    --blush:      #F4DCDD;   /* soft accent panel fill */
+    --gold:       #C98A2E;   /* marigold gold — used ONLY for "already done" days */
+    --gold-soft:  #F6E6C8;
+    --line:       rgba(42,27,34,0.14);
+    --shadow:     0 18px 40px -18px rgba(124,31,60,0.35);
+    --radius:     18px;
+    --serif:      'Fraunces', Georgia, serif;
+    --sans:       'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  *{ box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  body{
+    margin:0; min-height:100vh; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); line-height:1.5; position:relative; overflow-x:hidden;
+    padding:clamp(20px, 5vw, 56px) 16px 64px;
+  }
+
+  /* subtle paper grain so the ivory isn't flat */
+  body::before{
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.5;
+    background-image:
+      radial-gradient(circle at 15% 20%, rgba(178,58,91,0.04), transparent 40%),
+      radial-gradient(circle at 85% 75%, rgba(201,138,46,0.05), transparent 45%);
+  }
+
+  h1,h2,h3{ font-family:var(--serif); color:var(--rose-deep); margin:0; }
+  h1{ font-size:clamp(1.9rem, 4.6vw, 2.9rem); font-weight:700; line-height:1.12; }
+  h2{ font-size:clamp(1.4rem, 3vw, 1.9rem); font-weight:700; }
+  p{ margin:0; }
+  .lede{ color:var(--ink-soft); font-size:1.02rem; max-width:52ch; }
+
+  .wrap{ max-width:640px; margin:0 auto; position:relative; z-index:1; }
+
+  .page{ display:none; }
+  .page.active{ display:block; animation:riseIn .5s cubic-bezier(.2,.7,.3,1); }
+  @keyframes riseIn{ from{ opacity:0; transform:translateY(14px);} to{ opacity:1; transform:translateY(0);} }
+
+  /* ---------------------------------------------------------------------
+     Floating hearts — one gentle ambient touch, respects reduced motion
+  --------------------------------------------------------------------- */
+  #heartLayer{ position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden; }
+  .drift-heart{
+    position:absolute; bottom:-10%; font-size:1.2rem; opacity:.35;
+    animation:drift linear infinite;
+  }
+  @keyframes drift{
+    from{ transform:translateY(0) rotate(0deg); opacity:0; }
+    10%{ opacity:.4; }
+    90%{ opacity:.25; }
+    to{ transform:translateY(-115vh) rotate(25deg); opacity:0; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .drift-heart{ animation:none; display:none; }
+    .page.active{ animation:none; }
+  }
+
+  /* ---------------------------------------------------------------------
+     Shared "ticket / paper card" surface
+  --------------------------------------------------------------------- */
+  .panel{
+    background:var(--panel); border-radius:var(--radius); box-shadow:var(--shadow);
+    border:1px solid var(--line); padding:clamp(24px, 5vw, 40px);
+    position:relative;
+  }
+  .eyebrow{
+    display:inline-flex; align-items:center; gap:8px; font-family:var(--serif);
+    font-style:italic; color:var(--rose); font-size:.95rem; margin-bottom:14px;
+  }
+
+  /* ---------------------------------------------------------------------
+     PAGE 1 — the ask
+  --------------------------------------------------------------------- */
+  .ask-stack{ display:flex; flex-direction:column; gap:26px; text-align:center; align-items:center; }
+  .btn-row{
+    position:relative; display:flex; gap:16px; justify-content:center; align-items:center;
+    flex-wrap:wrap; min-height:64px; width:100%;
+  }
+  button{ font-family:var(--sans); cursor:pointer; border:none; }
+  .btn{
+    font-size:1.05rem; font-weight:600; padding:14px 30px; border-radius:999px;
+    transition:transform .18s ease, box-shadow .18s ease; letter-spacing:.01em;
+  }
+  .btn-yes{
+    background:var(--rose); color:#fff; box-shadow:0 12px 24px -10px rgba(124,31,60,.55);
+    transition:transform .25s cubic-bezier(.3,1.6,.5,1), font-size .25s ease, padding .25s ease;
+  }
+  .btn-yes:hover{ transform:translateY(-2px) scale(1.03); }
+  .btn-no{
+    background:transparent; color:var(--ink-soft); border:1.5px solid var(--line);
+    position:relative;
+  }
+  .no-wrap{ position:relative; }
+  .attempts{ font-size:.9rem; color:var(--ink-soft); font-style:italic; }
+
+  /* ---------------------------------------------------------------------
+     PAGE 2 — calendar + plan builder
+  --------------------------------------------------------------------- */
+  .cal-head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:6px; }
+  .cal-legend{ display:flex; gap:16px; font-size:.82rem; color:var(--ink-soft); margin:14px 0 18px; flex-wrap:wrap; }
+  .legend-dot{ display:inline-flex; align-items:center; gap:6px; }
+  .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; }
+  .dot.done{ background:var(--gold); }
+  .dot.planned{ background:var(--rose); }
+  .dot.open{ background:transparent; border:1.5px solid var(--line); }
+
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:8px; }
+  .cal-dow{ text-align:center; font-size:.72rem; color:var(--ink-soft); font-weight:600; padding-bottom:4px; }
+  .cal-cell{ aspect-ratio:1/1; }
+  .cal-cell.blank{ visibility:hidden; }
+  .day-btn{
+    width:100%; height:100%; border-radius:12px; background:var(--paper);
+    border:1.5px solid var(--line); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:2px; font-family:var(--sans);
+    font-weight:600; color:var(--ink); transition:all .15s ease; position:relative;
+  }
+  .day-btn:hover{ border-color:var(--rose); transform:translateY(-1px); }
+  .day-btn .num{ font-size:.95rem; }
+  .day-btn .tag{ font-size:.85rem; line-height:1; }
+  .day-btn.done{ background:var(--gold-soft); border-color:var(--gold); color:var(--rose-deep); }
+  .day-btn.planned{ background:var(--blush); border-color:var(--rose); }
+  .day-btn.selected{ outline:2px solid var(--rose-deep); outline-offset:2px; }
+  /* Past days (today included) can't be picked for a NEW plan — they're
+     dimmed and not clickable. Days already in CONFIG.alreadyDone still show
+     in gold even if they're in the past, since those are locked separately. */
+  .day-btn.past{ opacity:.4; cursor:not-allowed; }
+  .day-btn.past:hover{ transform:none; border-color:var(--line); }
+
+  .day-note{
+    margin-top:16px; background:var(--blush); border-radius:14px; padding:12px 16px;
+    font-size:.9rem; color:var(--rose-deep); display:none;
+  }
+  .day-note.show{ display:block; }
+
+  /* the drawer of date-idea cards */
+  #plannerDrawer{
+    margin-top:22px; padding-top:22px; border-top:1px dashed var(--line);
+    display:none;
+  }
+  #plannerDrawer.show{ display:block; animation:riseIn .35s ease; }
+  .drawer-title{ font-family:var(--serif); font-size:1.15rem; color:var(--rose-deep); margin-bottom:4px; }
+  .drawer-sub{ color:var(--ink-soft); font-size:.9rem; margin-bottom:16px; }
+
+  .option-list{ display:flex; flex-direction:column; gap:10px; }
+  .option-card{
+    display:flex; gap:14px; align-items:flex-start; text-align:left;
+    background:var(--paper); border:1.5px solid var(--line); border-radius:14px;
+    padding:14px 16px; width:100%; transition:border-color .15s ease, background .15s ease;
+  }
+  .option-card:hover{ border-color:var(--rose); }
+  .option-card.picked{ border-color:var(--rose); background:var(--blush); }
+  .option-emoji{ font-size:1.5rem; line-height:1; margin-top:2px; }
+  .option-body .option-title{ font-weight:600; margin-bottom:4px; font-size:1.02rem; }
+  /* option-desc can hold a full paragraph, not just a one-liner — it wraps
+     and grows automatically, no character limit to worry about. */
+  .option-body .option-desc{ color:var(--ink-soft); font-size:.92rem; line-height:1.55; display:block; }
+
+  .other-input{ margin-top:6px; }
+  .other-input input{
+    width:100%; font-family:var(--sans); font-size:.95rem; padding:10px 14px;
+    border-radius:10px; border:1.5px solid var(--line); background:var(--paper); color:var(--ink);
+  }
+  .other-input input:focus{ outline:none; border-color:var(--rose); }
+
+  .drawer-actions{ display:flex; gap:10px; margin-top:18px; flex-wrap:wrap; }
+
+  /* running list of chosen plans */
+  #planSummary{ margin-top:24px; }
+  .plan-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:10px 4px; border-bottom:1px solid var(--line); font-size:.92rem;
+  }
+  .plan-row:last-child{ border-bottom:none; }
+  .plan-row .plan-date{ font-weight:600; color:var(--rose-deep); min-width:64px; }
+  .plan-row .plan-title{ flex:1; }
+  .plan-row .remove-btn{ background:none; color:var(--ink-soft); font-size:.8rem; text-decoration:underline; padding:2px 4px; }
+
+  /* ---------------------------------------------------------------------
+     Buttons — secondary/ghost/small variants reused across pages
+  --------------------------------------------------------------------- */
+  .btn-primary{ background:var(--rose); color:#fff; padding:13px 28px; border-radius:999px; font-weight:600; }
+  .btn-primary:disabled{ opacity:.4; cursor:not-allowed; }
+  .btn-ghost{ background:transparent; color:var(--rose-deep); border:1.5px solid var(--line); padding:12px 22px; border-radius:999px; font-weight:600; }
+  .btn-sm{ font-size:.85rem; padding:9px 16px; border-radius:999px; font-weight:600; }
+  .btn-confirm-day{ background:var(--rose-deep); color:#fff; }
+  .btn-cancel-day{ background:transparent; color:var(--ink-soft); border:1px solid var(--line); }
+
+  .finale-cta{ text-align:center; margin-top:28px; }
+
+  /* ---------------------------------------------------------------------
+     PAGE 3 — the finale ticket
+  --------------------------------------------------------------------- */
+  .ticket-list{ display:flex; flex-direction:column; gap:14px; margin-top:20px; }
+  .ticket{
+    background:var(--paper); border:1.5px dashed var(--line); border-radius:14px;
+    padding:16px 18px; position:relative;
+  }
+  .ticket.done{ border-color:var(--gold); }
+  .ticket-top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .ticket-date{ font-family:var(--serif); font-weight:700; color:var(--rose-deep); font-size:1.05rem; }
+  .ticket-badge{ font-size:.72rem; text-transform:none; color:var(--ink-soft); background:var(--blush); padding:3px 10px; border-radius:999px; }
+  .ticket.done .ticket-badge{ background:var(--gold-soft); color:var(--rose-deep); }
+  .ticket-title{ font-weight:600; margin-top:4px; }
+  .ticket-desc{ color:var(--ink-soft); font-size:.88rem; margin-top:2px; }
+  .ticket-add{ margin-top:10px; font-size:.8rem; color:var(--rose); text-decoration:underline; display:inline-block; }
+
+  .finale-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:26px; }
+  .btn-download{ background:var(--rose-deep); color:#fff; }
+  .btn-whatsapp{ background:#3F8E5A; color:#fff; }
+  .btn-reset{ background:transparent; color:var(--ink-soft); border:1px solid var(--line); }
+
+  .foot-note{ margin-top:22px; font-size:.8rem; color:var(--ink-soft); text-align:center; }
+
+  a{ color:inherit; }
+  :focus-visible{ outline:2.5px solid var(--rose-deep); outline-offset:2px; }
+
+  @media (max-width:420px){
+    .day-btn .num{ font-size:.82rem; }
+    .btn{ padding:13px 22px; font-size:1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div id="heartLayer" aria-hidden="true"></div>
+
+<div class="wrap">
+
+  <!-- ======================= PAGE 1 — THE ASK ======================= -->
+  <section class="page active" id="page-ask">
+    <div class="panel ask-stack">
+      <span class="eyebrow">for you</span>
+      <div>
+        <h2 id="askTitle"><!-- filled by CONFIG.askTitle --></h2>
+        <p class="lede" id="askSubtitle" style="margin-top:10px;"><!-- filled by CONFIG.askSubtitle --></p>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-yes" id="yesBtn" type="button">Yes, obviously</button>
+        <div class="no-wrap">
+          <button class="btn btn-no" id="noBtn" type="button">No</button>
+        </div>
+      </div>
+      <p class="attempts" id="attemptsLine" style="display:none;">The "no" button has tried to escape <span id="attemptCount">0</span> time(s).</p>
+    </div>
+  </section>
+
+  <!-- ======================= PAGE 2 — CALENDAR + PLAN BUILDER ======================= -->
+  <section class="page" id="page-plan">
+    <div class="panel">
+      <span class="eyebrow" id="planEyebrow">step two</span>
+      <div class="cal-head">
+        <h2 id="calMonthLabel"></h2>
+      </div>
+      <p class="lede" id="planIntro"></p>
+
+      <div class="cal-legend">
+        <span class="legend-dot"><span class="dot done"></span> already happened / decided</span>
+        <span class="legend-dot"><span class="dot planned"></span> planned</span>
+        <span class="legend-dot"><span class="dot open"></span> pick a day</span>
+        <span class="legend-dot"><span class="dot" style="background:var(--line);"></span> already gone</span>
+      </div>
+
+      <div class="cal-grid" id="calDow"></div>
+      <div class="cal-grid" id="calGrid"></div>
+
+      <div class="day-note" id="dayNote"></div>
+
+      <!-- drawer: appears when an open day is clicked -->
+      <div id="plannerDrawer">
+        <div class="drawer-title" id="drawerTitle">What should we do on <span id="drawerDate"></span>?</div>
+        <div class="drawer-sub">Pick whichever sounds good — you can change it later.</div>
+        <div class="option-list" id="optionList"></div>
+        <div class="drawer-actions">
+          <button class="btn-sm btn-confirm-day" id="confirmDayBtn" type="button" disabled>Lock it in</button>
+          <button class="btn-sm btn-cancel-day" id="cancelDayBtn" type="button">Never mind</button>
+        </div>
+      </div>
+
+      <div id="planSummary"></div>
+
+      <div class="finale-cta">
+        <button class="btn-primary" id="toFinaleBtn" type="button" disabled>Make it official →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= PAGE 3 — FINALE TICKET ======================= -->
+  <section class="page" id="page-finale">
+    <div class="panel">
+      <span class="eyebrow">it's official</span>
+      <h2 id="finaleTitle"></h2>
+      <p class="lede" id="finaleSubtitle" style="margin-top:8px;"></p>
+
+      <div class="ticket-list" id="ticketList"></div>
+
+      <div class="finale-actions">
+        <button class="btn-sm btn-download" id="downloadIcsBtn" type="button">Download calendar file (.ics)</button>
+        <button class="btn-sm btn-whatsapp" id="whatsappBtn" type="button">Share on WhatsApp</button>
+        <button class="btn-sm btn-reset" id="resetBtn" type="button">Start over</button>
+      </div>
+
+      <p class="foot-note">"Add to Google Calendar" links on each entry above open Google's own quick-add page — nothing is connected or auto-synced, it just pre-fills the event for a one-tap save.</p>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ============================================================================
+   CONFIG — the only section you should need to touch
+   ============================================================================ */
+const NOW = new Date(); // read once, used below to auto-pick "this month"
+
+const CONFIG = {
+  you: "Nachi",              // TODO: your name (used in the WhatsApp message)
+  her: "Rishu ",              // TODO: her name (used in headings/messages)
+
+  askTitle: "Would you like to go on a date with me? \u{1F60D}  Tenu mainu waste date te le jaoge? \u{1F60D}  Tula Mazha sobat Date vr yayala avdel ka ? \u{1F60D}", // TODO: the opening question (can be a full paragraph)
+  // askSubtitle: "Fair warning: the \u201cNo\u201d button is a coward and will not stay still. The \u201cYes\u201d button, on the other hand, has never let anyone down.",
+  askSubtitle: "Soch samajh ke answer dena haan medam 😌❤️ kyunki agar haa bol diya toh phir iss month ki ek date officially meri hui haan  🫶🏻 And No ka option hai... par main usse accept karunga ya nahi, ye alag baat hai so decide according to that 😂",
+
+  // Which month the calendar shows (month is 0-indexed: 8 = September).
+  // These default to whatever month/year it is RIGHT NOW on the device that
+  // built the page — so most of the time you don't need to touch this at
+  // all. Only hardcode a number here instead of NOW.getFullYear()/getMonth()
+  // if you want to plan a different month ahead of time (e.g. show next
+  // month's calendar before it actually arrives).
+  year: NOW.getFullYear(),
+  month: NOW.getMonth(),
+
+  // Dates that are already settled — either something you've ALREADY done
+  // (a past date) or something you've already decided on together even if
+  // it's a few days out (like the Ganpati plan). Either way these show
+  // locked, in gold, and can't be re-picked or overwritten.
+  // key = day number, note = short line shown on the finale ticket + on tap.
+  alreadyDone: {
+    3:  { title: "Let's meet for the bet winning",              note: "Already happened \u2014 still thinking about it. and thank for choclates on that day" },
+    10: { title: "Our date",              note: "Already happened \u2014 another good one." },
+    14: { title: "Ganpati Prasad", note: "Already decided \u2014 give you ganapati modak as prasad and spend some time with you." }
+  },
+
+  // The list of date ideas she can pick from for any other day.
+  // "desc" can be as long as you want — a full paragraph, timing details,
+  // what to expect, directions, whatever's useful. It wraps automatically
+  // and the card grows to fit, so don't hold back.
+  planOptions: [
+    {
+      id: "ambernath",
+      emoji: "\u{1F6D5}",
+      title: "Ambernath Shiv Mandir",
+      desc: "we can go to shiv mandir like evening like around 3-4 and take the darshan wait sepnd soem time then we'll leave \u2014 quiet, old-stone, no rush.",
+      location: "Ambernath Shiv Mandir, Ambernath"
+    },
+    {
+      id: "titwala",
+      emoji: "\u{1F419}",
+      title: "Titwala Ganpati Mandir",
+      desc: "we can go to ganpati mandir any time of the day we'll go in late afternoon and then we'll took darshan and i can also have scotter of harsh we can explore and roam around there after mandir we can go to the river and all sepnd soem time then we'll leave \u2014 quiet, no rush.",
+      location: "Titwala Ganpati Mandir, Titwala"
+    },
+    {
+      id: "mimi-park",
+      emoji: "\u2615",
+      title: "Mimi Cafe\u00e9 + City Park Walk, Kalyan",
+      desc: "Coffee or pasta  first, then a slow lap of the park.",
+      location: "Mimi's Caf\u00e9, Kalyan"
+    },
+    {
+      id: "citypark",
+      emoji: "\u{1F333}",
+      title: "City Park Walk",
+      desc: "Nothing fancy \u2014 just a walk, just us.",
+      location: "City Park, Kalyan"
+    },
+    {
+      id: "talaopali",
+      emoji: "\u{1F30A}",
+      title: "Talao Pali, Thane \u2014 Evening Walk",
+      desc: "Works even on your office day \u2014 you'll just need to leave a little early.",
+      location: "Talao Pali Lake, Thane"
+    },
+    {
+      id: "dadar-day",
+      emoji: "\u{1F305}",
+      title: "The Dadar Day",
+      desc: "The full plan: leave late morning, breakfast at Ramashray we'll have the podi idly and pinepapple sheera then had , darshan at Siddhivinayak or ISKCON, then catch the sunset before heading home.",
+      location: "Dadar, Mumbai"
+    },
+    {
+      id: "mall",
+      emoji: "\u{1F6CD}\uFE0F",
+      title: "Mall Day",
+      desc: "we can plan this according to your decision that's work for me ok like Shopping, food court, maybe a movie if something's on.",
+      location: "Mall"
+    },
+    {
+      id: "mahad",
+      emoji: "\u{1F419}",
+      title: "Mahad varadvinaayak mandir and gagangiri math",
+      desc: "we need to take 7.51 local to the karjat and then had vada pav at there then we'll catch train for khopoli once we reach there we'll head to mahad via rikshaw and take the darshan spend some time in there and then we'll go at gagangiri maharaj math on the way if we had time and catch 3.40 train from there and reach to home by 6-7 PM ",
+      location: "Khopoli"
+    },
+    {
+      id: "other",
+      emoji: "\u270D\uFE0F",
+      title: "Something else",
+      desc: "Your idea \u2014 tell me and I'm in.",
+      location: ""
+    }
+  ],
+
+  // Optional: a specific WhatsApp number to send the plan to, in international
+  // format with no + or spaces (e.g. "919876543210"). Leave "" to let her
+  // choose who to send it to from her own WhatsApp.
+  whatsappNumber: "8828476938"
+};
+
+/* ============================================================================
+   STATE
+   ============================================================================ */
+const state = {
+  plans: {},          // day(number) -> { title, desc, location, optionId }
+  selectedDay: null,
+  pickedOptionId: null
+};
+
+/* ============================================================================
+   Small helpers
+   ============================================================================ */
+const $ = (sel, root=document) => root.querySelector(sel);
+const $all = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+function pad(n){ return String(n).padStart(2,"0"); }
+
+function showPage(id){
+  $all(".page").forEach(p => p.classList.remove("active"));
+  $(`#${id}`).classList.add("active");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+/* ============================================================================
+   Ambient floating hearts (purely decorative, respects reduced motion)
+   ============================================================================ */
+(function spawnHearts(){
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const layer = $("#heartLayer");
+  const glyphs = ["\u2764\uFE0F","\u{1F49E}","\u{1F338}"];
+  for (let i=0;i<10;i++){
+    const el = document.createElement("span");
+    el.className = "drift-heart";
+    el.textContent = glyphs[i % glyphs.length];
+    el.style.left = Math.random()*100 + "%";
+    el.style.animationDuration = (14 + Math.random()*10) + "s";
+    el.style.animationDelay = (Math.random()*12) + "s";
+    el.style.fontSize = (0.9 + Math.random()*0.9) + "rem";
+    layer.appendChild(el);
+  }
+})();
+
+/* ============================================================================
+   PAGE 1 — the ask (classic dodging "No" button)
+   ============================================================================ */
+$("#askTitle").textContent = CONFIG.askTitle;
+$("#askSubtitle").textContent = CONFIG.askSubtitle;
+
+let dodgeCount = 0;
+const noBtn = $("#noBtn");
+const yesBtn = $("#yesBtn");
+const btnRow = $(".btn-row");
+
+function dodge(){
+  dodgeCount++;
+  $("#attemptsLine").style.display = "block";
+  $("#attemptCount").textContent = dodgeCount;
+
+  const rowRect = btnRow.getBoundingClientRect();
+  const btnRect = noBtn.getBoundingClientRect();
+  const maxX = Math.max(0, rowRect.width - btnRect.width);
+  const maxY = Math.max(0, 70 - btnRect.height);
+  const x = (Math.random() - 0.5) * maxX;
+  const y = (Math.random() - 0.5) * maxY;
+
+  noBtn.style.position = "relative";
+  noBtn.style.transform = `translate(${x}px, ${y}px)`;
+
+  // Yes button grows a little more encouraging each time
+  const scale = Math.min(1.5, 1 + dodgeCount * 0.06);
+  yesBtn.style.transform = `scale(${scale})`;
+  const labels = ["Yes, obviously","Yes, please","Still yes","100% yes","Yes forever"];
+  yesBtn.textContent = labels[Math.min(dodgeCount, labels.length - 1)];
+}
+
+noBtn.addEventListener("mouseenter", dodge);
+noBtn.addEventListener("click", (e) => { e.preventDefault(); dodge(); });
+noBtn.addEventListener("touchstart", (e) => { e.preventDefault(); dodge(); }, { passive:false });
+
+yesBtn.addEventListener("click", () => {
+  buildCalendarPage();
+  showPage("page-plan");
+});
+
+/* ============================================================================
+   PAGE 2 — calendar + plan builder
+   ============================================================================ */
+function buildCalendarPage(){
+  $("#calMonthLabel").textContent = `${MONTH_NAMES[CONFIG.month]} ${CONFIG.year}`;
+  $("#planIntro").textContent = `A couple of these days are already spoken for. Tap any other day and pick what we do.`;
+
+  // day-of-week header row
+  const dowGrid = $("#calDow");
+  dowGrid.innerHTML = "";
+  DOW.forEach(d => {
+    const el = document.createElement("div");
+    el.className = "cal-dow";
+    el.textContent = d;
+    dowGrid.appendChild(el);
+  });
+
+  renderCalendarGrid();
+  renderPlanSummary();
+}
+
+function renderCalendarGrid(){
+  const grid = $("#calGrid");
+  grid.innerHTML = "";
+
+  const firstDow = new Date(CONFIG.year, CONFIG.month, 1).getDay();
+  const daysInMonth = new Date(CONFIG.year, CONFIG.month + 1, 0).getDate();
+
+  // "Today" is read live from the device clock, not hardcoded — so this
+  // still works correctly whenever she actually opens the page. Any day on
+  // or before today can't be picked for a NEW plan (you can't plan a date
+  // for today or the past). Days already in CONFIG.alreadyDone are exempt
+  // from this — they stay locked-in and gold no matter what.
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  for (let i=0; i<firstDow; i++){
+    const blank = document.createElement("div");
+    blank.className = "cal-cell blank";
+    grid.appendChild(blank);
+  }
+
+  for (let day=1; day<=daysInMonth; day++){
+    const cell = document.createElement("div");
+    cell.className = "cal-cell";
+
+    const btn = document.createElement("button");
+    btn.className = "day-btn";
+    btn.type = "button";
+
+    const isDone = !!CONFIG.alreadyDone[day];
+    const plan = state.plans[day];
+    const cellDate = new Date(CONFIG.year, CONFIG.month, day);
+    const isPast = cellDate <= today;
+
+    if (isDone) btn.classList.add("done");
+    else if (plan) btn.classList.add("planned");
+    else if (isPast) btn.classList.add("past");
+
+    if (state.selectedDay === day) btn.classList.add("selected");
+
+    const num = document.createElement("span");
+    num.className = "num";
+    num.textContent = day;
+    btn.appendChild(num);
+
+    if (isDone){
+      const tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = "\u2728";
+      btn.appendChild(tag);
+    } else if (plan){
+      const tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = "\u2764\uFE0F";
+      btn.appendChild(tag);
+    }
+
+    btn.addEventListener("click", () => onDayClick(day, isDone, isPast));
+    cell.appendChild(btn);
+    grid.appendChild(cell);
+  }
+}
+
+function onDayClick(day, isDone, isPast){
+  const note = $("#dayNote");
+
+  if (isDone){
+    const info = CONFIG.alreadyDone[day];
+    note.textContent = `${MONTH_NAMES[CONFIG.month]} ${day} \u2014 ${info.title}. ${info.note}`;
+    note.classList.add("show");
+    closeDrawer();
+    return;
+  }
+
+  if (isPast){
+    note.textContent = `${MONTH_NAMES[CONFIG.month]} ${day} has already gone \u2014 pick a day ahead of today.`;
+    note.classList.add("show");
+    closeDrawer();
+    return;
+  }
+
+  note.classList.remove("show");
+  state.selectedDay = day;
+  state.pickedOptionId = state.plans[day] ? state.plans[day].optionId : null;
+  openDrawer(day);
+  renderCalendarGrid();
+}
+
+function openDrawer(day){
+  $("#drawerDate").textContent = `${MONTH_NAMES[CONFIG.month]} ${day}`;
+  const list = $("#optionList");
+  list.innerHTML = "";
+
+  CONFIG.planOptions.forEach(opt => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "option-card";
+    if (state.pickedOptionId === opt.id) card.classList.add("picked");
+
+    card.innerHTML = `
+      <span class="option-emoji">${opt.emoji}</span>
+      <span class="option-body">
+        <span class="option-title">${opt.title}</span>
+        <span class="option-desc">${opt.desc}</span>
+      </span>
+    `;
+
+    card.addEventListener("click", () => {
+      state.pickedOptionId = opt.id;
+      $all(".option-card", list).forEach(c => c.classList.remove("picked"));
+      card.classList.add("picked");
+      $("#confirmDayBtn").disabled = false;
+
+      const existingCustom = $("#customIdeaInput");
+      if (opt.id === "other"){
+        if (!existingCustom) addCustomInput();
+      } else if (existingCustom){
+        existingCustom.closest(".other-input").remove();
+      }
+    });
+
+    list.appendChild(card);
+  });
+
+  if (state.pickedOptionId === "other") addCustomInput();
+
+  $("#plannerDrawer").classList.add("show");
+  $("#confirmDayBtn").disabled = !state.pickedOptionId;
+}
+
+function addCustomInput(){
+  const wrap = document.createElement("div");
+  wrap.className = "other-input";
+  wrap.innerHTML = `<input type="text" id="customIdeaInput" placeholder="Tell me your idea..." maxlength="120" />`;
+  $("#optionList").appendChild(wrap);
+  const existingPlan = state.plans[state.selectedDay];
+  if (existingPlan && existingPlan.optionId === "other"){
+    $("#customIdeaInput").value = existingPlan.title;
+  }
+}
+
+function closeDrawer(){
+  $("#plannerDrawer").classList.remove("show");
+  state.selectedDay = null;
+  state.pickedOptionId = null;
+  renderCalendarGrid();
+}
+
+$("#cancelDayBtn").addEventListener("click", closeDrawer);
+
+$("#confirmDayBtn").addEventListener("click", () => {
+  const day = state.selectedDay;
+  const opt = CONFIG.planOptions.find(o => o.id === state.pickedOptionId);
+  if (!day || !opt) return;
+
+  let title = opt.title;
+  let desc = opt.desc;
+  if (opt.id === "other"){
+    const custom = $("#customIdeaInput");
+    const val = custom ? custom.value.trim() : "";
+    if (val) { title = val; desc = "Her idea."; }
+  }
+
+  state.plans[day] = { title, desc, location: opt.location || "", optionId: opt.id };
+  closeDrawer();
+  renderPlanSummary();
+});
+
+function renderPlanSummary(){
+  const wrap = $("#planSummary");
+  const days = Object.keys(state.plans).map(Number).sort((a,b)=>a-b);
+
+  if (days.length === 0){
+    wrap.innerHTML = "";
+    $("#toFinaleBtn").disabled = true;
+    return;
+  }
+
+  const rows = days.map(day => {
+    const plan = state.plans[day];
+    return `
+      <div class="plan-row">
+        <span class="plan-date">${MONTH_NAMES[CONFIG.month].slice(0,3)} ${day}</span>
+        <span class="plan-title">${plan.title}</span>
+        <button class="remove-btn" data-day="${day}" type="button">remove</button>
+      </div>`;
+  }).join("");
+
+  wrap.innerHTML = `<div class="drawer-title" style="font-size:1rem;">Your plan so far</div>${rows}`;
+
+  $all(".remove-btn", wrap).forEach(b => {
+    b.addEventListener("click", () => {
+      delete state.plans[Number(b.dataset.day)];
+      renderCalendarGrid();
+      renderPlanSummary();
+    });
+  });
+
+  $("#toFinaleBtn").disabled = false;
+}
+
+$("#toFinaleBtn").addEventListener("click", () => {
+  buildFinalePage();
+  showPage("page-finale");
+});
+
+/* ============================================================================
+   PAGE 3 — finale ticket + downloads
+   ============================================================================ */
+function allEntriesSorted(){
+  const entries = [];
+  Object.entries(CONFIG.alreadyDone).forEach(([day, info]) => {
+    entries.push({ day:Number(day), title:info.title, desc:info.note, location:"", done:true });
+  });
+  Object.entries(state.plans).forEach(([day, plan]) => {
+    entries.push({ day:Number(day), title:plan.title, desc:plan.desc, location:plan.location, done:false });
+  });
+  return entries.sort((a,b) => a.day - b.day);
+}
+
+function buildFinalePage(){
+  $("#finaleTitle").textContent = `${MONTH_NAMES[CONFIG.month]}, sorted.`;
+  $("#finaleSubtitle").textContent = `Every date, old and new, in one place.`;
+
+  const list = $("#ticketList");
+  list.innerHTML = "";
+
+  allEntriesSorted().forEach(entry => {
+    const dateStr = `${CONFIG.year}-${pad(CONFIG.month+1)}-${pad(entry.day)}`;
+    const gcalHref = googleCalendarLink(entry, dateStr);
+
+    const el = document.createElement("div");
+    el.className = "ticket" + (entry.done ? " done" : "");
+    el.innerHTML = `
+      <div class="ticket-top">
+        <span class="ticket-date">${MONTH_NAMES[CONFIG.month]} ${entry.day}</span>
+        <span class="ticket-badge">${entry.done ? "already happened" : "planned"}</span>
+      </div>
+      <div class="ticket-title">${entry.title}</div>
+      <div class="ticket-desc">${entry.desc}</div>
+      ${entry.done ? "" : `<a class="ticket-add" href="${gcalHref}" target="_blank" rel="noopener">+ Add to Google Calendar</a>`}
+    `;
+    list.appendChild(el);
+  });
+}
+
+function icsEscape(str){
+  return String(str).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n");
+}
+
+function googleCalendarLink(entry, dateStr){
+  const startCompact = dateStr.replace(/-/g,"");
+  const nextDay = new Date(CONFIG.year, CONFIG.month, entry.day + 1);
+  const endCompact = `${nextDay.getFullYear()}${pad(nextDay.getMonth()+1)}${pad(nextDay.getDate())}`;
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: entry.title,
+    dates: `${startCompact}/${endCompact}`,
+    details: entry.desc,
+    location: entry.location || ""
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+$("#downloadIcsBtn").addEventListener("click", () => {
+  const entries = allEntriesSorted();
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//us//date-plan//EN",
+    "CALSCALE:GREGORIAN"
+  ];
+
+  entries.forEach((entry, i) => {
+    const dateCompact = `${CONFIG.year}${pad(CONFIG.month+1)}${pad(entry.day)}`;
+    const nextDay = new Date(CONFIG.year, CONFIG.month, entry.day + 1);
+    const endCompact = `${nextDay.getFullYear()}${pad(nextDay.getMonth()+1)}${pad(nextDay.getDate())}`;
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:date-plan-${CONFIG.year}${pad(CONFIG.month+1)}${pad(entry.day)}-${i}@local`,
+      `DTSTAMP:${dateCompact}T000000Z`,
+      `DTSTART;VALUE=DATE:${dateCompact}`,
+      `DTEND;VALUE=DATE:${endCompact}`,
+      `SUMMARY:${icsEscape("Date: " + entry.title)}`,
+      `DESCRIPTION:${icsEscape(entry.desc)}`,
+      entry.location ? `LOCATION:${icsEscape(entry.location)}` : null,
+      "END:VEVENT"
+    );
+  });
+
+  lines.push("END:VCALENDAR");
+  const icsContent = lines.filter(Boolean).join("\r\n");
+
+  const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${CONFIG.her.replace(/\s+/g,"_")}_date_plan_${MONTH_NAMES[CONFIG.month]}_${CONFIG.year}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+$("#whatsappBtn").addEventListener("click", () => {
+  const entries = allEntriesSorted();
+  const lines = entries.map(e => `${MONTH_NAMES[CONFIG.month].slice(0,3)} ${e.day} \u2014 ${e.title}`);
+  const message = `Our ${MONTH_NAMES[CONFIG.month]} plan \u{1F49E}\n\n${lines.join("\n")}`;
+  const base = CONFIG.whatsappNumber
+    ? `https://api.whatsapp.com/send?phone=${CONFIG.whatsappNumber}`
+    : `https://api.whatsapp.com/send`;
+  const url = `${base}${CONFIG.whatsappNumber ? "&" : "?"}text=${encodeURIComponent(message)}`;
+  window.open(url, "_blank", "noopener");
+});
+
+$("#resetBtn").addEventListener("click", () => {
+  state.plans = {};
+  state.selectedDay = null;
+  state.pickedOptionId = null;
+  dodgeCount = 0;
+  yesBtn.style.transform = "";
+  yesBtn.textContent = "Yes, obviously";
+  noBtn.style.transform = "";
+  $("#attemptsLine").style.display = "none";
+  showPage("page-ask");
+});
+</script>
+</body>
+</html>
